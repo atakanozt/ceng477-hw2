@@ -1,6 +1,8 @@
 #ifndef __MATRIX4_H__
 #define __MATRIX4_H__
 
+#include <iostream>
+
 class Matrix4
 {
 public:

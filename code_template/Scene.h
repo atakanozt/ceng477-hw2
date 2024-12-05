@@ -1,5 +1,6 @@
 #ifndef _SCENE_H_
 #define _SCENE_H_
+#include <vector>
 #include "Vec3.h"
 #include "Vec4.h"
 #include "Color.h"
