@@ -75,3 +75,44 @@ Matrix4 Camera::getCameraTransformationMatrix() {
 
     return Matrix4(matrix_values);
 }
+
+Matrix4 Camera::getProjectionTransformationMatrix() {
+    double l = left;
+    double r = right;
+    double t = top;
+    double b = bottom;
+    double n = near;
+    double f = far;
+
+    double orthographic_matrix_values[4][4] = {
+        {2/(r-l), 0, 0, -(r+l)/(r-l)},
+        {0, 2/(t-b), 0, -(t+b)/(t-b)},
+        {0, 0, -2/(f-n), -(f+n)/(f-n)},
+        {0, 0, 0, 1}
+    };
+    Matrix4 orthographic_matrix = Matrix4(orthographic_matrix_values);
+
+    if (projectionType == 0) {
+        return orthographic_matrix;
+    }
+
+    double perspective_matrix_values[4][4] = {
+        {2*n/(r-l), 0, (r+l)/(r-l), 0},
+        {0, 2*n/(t-b), (t+b)/(t-b), 0},
+        {0, 0, -(f+n)/(f-n), -2*(f*n)/(f-n)},
+        {0, 0, -1, 0}
+    };
+    Matrix4 perspective_matrix = Matrix4(perspective_matrix_values);
+
+    return perspective_matrix;
+}
+
+Matrix4 Camera::getViewportTransformationMatrix() {
+    double matrix_values[4][4] = {
+        {horRes*0.5, 0, 0, (horRes-1)*0.5},
+        {0, verRes*0.5, 0, (verRes-1)*0.5},
+        {0, 0, 0.5, 0.5},
+        {0, 0, 0, 1.0}
+    };
+    return Matrix4(matrix_values);
+}
