@@ -360,5 +360,6 @@ void Scene::convertPPMToPNG(string ppmFileName, int osType)
 */
 void Scene::forwardRenderingPipeline(Camera *camera)
 {
-	// TODO: Implement this function
+	// Camera Transformation
+	Matrix4 cameraTransformationMatrix = camera->getCameraTransformationMatrix();
 }

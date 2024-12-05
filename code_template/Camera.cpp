@@ -63,3 +63,15 @@ std::ostream &operator<<(std::ostream &os, const Camera &c)
 
     return os;
 }
+
+Matrix4 Camera::getCameraTransformationMatrix() {
+    Vec3 e = position;
+    double matrix_values[4][4] = {
+        {u.x, u.y, u.z, -(u.x * e.x + u.y * e.y + u.z * e.z)},
+        {v.x, v.y, v.z, -(v.x * e.x + v.y * e.y + v.z * e.z)},
+        {w.x, w.y, w.z, -(w.x * e.x + w.y * e.y + w.z * e.z)},
+        {0, 0, 0, 1}
+    };
+
+    return Matrix4(matrix_values);
+}

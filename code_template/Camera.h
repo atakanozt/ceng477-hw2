@@ -3,7 +3,7 @@
 #define ORTOGRAPHIC_PROJECTION 0
 #define PERSPECTIVE_PROJECTION 1
 #include "Vec3.h"
-
+#include "Matrix4.h"
 class Camera
 {
 
@@ -25,6 +25,8 @@ public:
            std::string outputFilename);
 
     Camera(const Camera &other);
+
+    Matrix4 getCameraTransformationMatrix();
 
     friend std::ostream &operator<<(std::ostream &os, const Camera &c);
 };
