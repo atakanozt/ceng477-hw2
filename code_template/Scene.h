@@ -9,6 +9,7 @@
 #include "Translation.h"
 #include "Camera.h"
 #include "Mesh.h"
+#include "Helpers.h"
 
 class Scene
 {
@@ -31,6 +32,7 @@ public:
 	int makeBetweenZeroAnd255(double value);
 	void writeImageToPPMFile(Camera *camera);
 	void convertPPMToPNG(std::string ppmFileName, int osType);
+	Matrix4 getModelingTransformationMatrix(Mesh* mesh);
 	void forwardRenderingPipeline(Camera *camera);
 };
 

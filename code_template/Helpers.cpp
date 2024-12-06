@@ -164,3 +164,14 @@ Vec4 multiplyMatrixWithVec4(Matrix4 m, Vec4 v)
 
     return Vec4(values[0], values[1], values[2], values[3], v.colorId);
 }
+
+void printMatrix(Matrix4 m) {
+    std::cout << "********************" << std::endl;
+    for(int i = 0; i < 4; i++) {
+        for(int j = 0; j < 4; j++) {
+            std::cout << m.values[i][j] << " ";
+        }
+        std::cout << std::endl;
+    }
+    std::cout << "********************" << std::endl;
+}

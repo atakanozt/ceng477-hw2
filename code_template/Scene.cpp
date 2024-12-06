@@ -354,6 +354,27 @@ void Scene::convertPPMToPNG(string ppmFileName, int osType)
 	}
 }
 
+Matrix4 Scene::getModelingTransformationMatrix(Mesh* mesh) {
+	Matrix4 modelingTransformationMatrix = getIdentityMatrix();
+
+	for(int i = 0; i < mesh->numberOfTransformations; i++) {
+		int transformation_id = mesh->transformationIds[i];
+		char transformation_type = mesh->transformationTypes[i];
+		if(transformation_type == 't') {
+			Translation* translation = this->translations[transformation_id-1];
+			modelingTransformationMatrix = translation->doTranslation(modelingTransformationMatrix);
+		}
+		else if(transformation_type == 's') {
+			Scaling* scaling = this->scalings[transformation_id-1];
+			modelingTransformationMatrix = scaling->doScaling(modelingTransformationMatrix);
+		}
+		else if(transformation_type == 'r') {
+			Rotation* rotation = this->rotations[transformation_id-1];
+			modelingTransformationMatrix = rotation->doRotation(modelingTransformationMatrix);
+		}
+	}
+	return modelingTransformationMatrix;
+}
 
 /*
 	Transformations, clipping, culling, rasterization are done here.
@@ -372,4 +393,16 @@ void Scene::forwardRenderingPipeline(Camera *camera)
 	Matrix4 viewportTransformationMatrix = camera->getViewportTransformationMatrix();
 
 	// ***** End of Viewing Transformation ***** //
+
+	Matrix4 modelingTransformationMatrix = getIdentityMatrix();
+	for(Mesh* mesh : this->meshes) {
+		modelingTransformationMatrix = getModelingTransformationMatrix(mesh);
+	}
+
+	// compose transformation matrix
+	Matrix4 transformationMatrix = multiplyMatrixWithMatrix(cameraTransformationMatrix, modelingTransformationMatrix);
+	transformationMatrix = multiplyMatrixWithMatrix(projectionTransformationMatrix, transformationMatrix);
+
+	printMatrix(transformationMatrix);
+
 }

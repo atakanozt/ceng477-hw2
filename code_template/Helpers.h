@@ -72,4 +72,6 @@ Matrix4 multiplyMatrixWithMatrix(Matrix4 m1, Matrix4 m2);
  */
 Vec4 multiplyMatrixWithVec4(Matrix4 m, Vec4 v);
 
+void printMatrix(Matrix4 m);
+
 #endif
