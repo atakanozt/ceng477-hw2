@@ -15,6 +15,13 @@
 using namespace tinyxml2;
 using namespace std;
 
+double X_MAX = 1;
+double X_MIN = -1;
+double Y_MAX = 1;
+double Y_MIN = -1;
+double Z_MAX = 1;
+double Z_MIN = -1;
+
 /*
 	Parses XML file
 */
@@ -376,6 +383,40 @@ Matrix4 Scene::getModelingTransformationMatrix(Mesh* mesh) {
 	return modelingTransformationMatrix;
 }
 
+vector<Vec4> Scene::getTransformedTriangleVertices(Triangle& triangle, Matrix4& transformationMatrix, vector<Vec3 *>& vertices) {
+	vector<Vec4> transformed_vertices;
+
+	Vec3 vertex_0 = *vertices[triangle.vertexIds[0] - 1];
+	Vec3 vertex_1 = *vertices[triangle.vertexIds[1] - 1];
+	Vec3 vertex_2 = *vertices[triangle.vertexIds[2] - 1];
+
+	Vec4 transformed_vertex_0 = multiplyMatrixWithVec4(transformationMatrix, Vec4(vertex_0.x, vertex_0.y, vertex_0.z, 1));
+	Vec4 transformed_vertex_1 = multiplyMatrixWithVec4(transformationMatrix, Vec4(vertex_1.x, vertex_1.y, vertex_1.z, 1));
+	Vec4 transformed_vertex_2 = multiplyMatrixWithVec4(transformationMatrix, Vec4(vertex_2.x, vertex_2.y, vertex_2.z, 1));
+
+
+	transformed_vertex_0.x /= transformed_vertex_0.t;
+	transformed_vertex_0.y /= transformed_vertex_0.t;
+	transformed_vertex_0.z /= transformed_vertex_0.t;
+	transformed_vertex_0.t = 1;
+
+	transformed_vertex_1.x /= transformed_vertex_1.t;
+	transformed_vertex_1.y /= transformed_vertex_1.t;
+	transformed_vertex_1.z /= transformed_vertex_1.t;
+	transformed_vertex_1.t = 1;
+
+	transformed_vertex_2.x /= transformed_vertex_2.t;
+	transformed_vertex_2.y /= transformed_vertex_2.t;
+	transformed_vertex_2.z /= transformed_vertex_2.t;
+	transformed_vertex_2.t = 1;
+
+	transformed_vertices.push_back(transformed_vertex_0);
+	transformed_vertices.push_back(transformed_vertex_1);
+	transformed_vertices.push_back(transformed_vertex_2);
+
+	return transformed_vertices;
+}
+
 /*
 	Transformations, clipping, culling, rasterization are done here.
 */
@@ -397,12 +438,38 @@ void Scene::forwardRenderingPipeline(Camera *camera)
 	Matrix4 modelingTransformationMatrix = getIdentityMatrix();
 	for(Mesh* mesh : this->meshes) {
 		modelingTransformationMatrix = getModelingTransformationMatrix(mesh);
+
+		// compose transformation matrix
+		Matrix4 transformationMatrix = multiplyMatrixWithMatrix(cameraTransformationMatrix, modelingTransformationMatrix);
+		transformationMatrix = multiplyMatrixWithMatrix(projectionTransformationMatrix, transformationMatrix);
+
+		for(Triangle& triangle : mesh->triangles) {
+			vector<Vec4> transformed_vertices = getTransformedTriangleVertices(triangle, transformationMatrix, this->vertices);
+
+			if(this->cullingEnabled) {
+				Vec3 vertex_0 = Vec3(transformed_vertices[0].x, transformed_vertices[0].y, transformed_vertices[0].z);
+				Vec3 vertex_1 = Vec3(transformed_vertices[1].x, transformed_vertices[1].y, transformed_vertices[1].z);
+				Vec3 vertex_2 = Vec3(transformed_vertices[2].x, transformed_vertices[2].y, transformed_vertices[2].z);
+
+				Vec3 v1_minus_v0 = subtractVec3(vertex_1, vertex_0);
+				Vec3 v2_minus_v0 = subtractVec3(vertex_2, vertex_0);
+
+				Vec3 normal = normalizeVec3(crossProductVec3(v1_minus_v0, v2_minus_v0));
+				if(dotProductVec3(normal, vertex_0) < 0) continue;
+			}
+
+			vector<Color> triangleVertexColors;
+			for(int i = 0; i < 3; i++) {
+				triangleVertexColors.push_back(*this->colorsOfVertices[triangle.vertexIds[i] - 1]);
+			}
+
+			if(mesh->type == WIREFRAME_MESH) {
+
+		}
 	}
 
-	// compose transformation matrix
-	Matrix4 transformationMatrix = multiplyMatrixWithMatrix(cameraTransformationMatrix, modelingTransformationMatrix);
-	transformationMatrix = multiplyMatrixWithMatrix(projectionTransformationMatrix, transformationMatrix);
 
-	printMatrix(transformationMatrix);
+
+
 
 }

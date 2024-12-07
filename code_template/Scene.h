@@ -33,6 +33,7 @@ public:
 	void writeImageToPPMFile(Camera *camera);
 	void convertPPMToPNG(std::string ppmFileName, int osType);
 	Matrix4 getModelingTransformationMatrix(Mesh* mesh);
+	vector<Vec4> getTransformedTriangleVertices(Triangle& triangle, Matrix4& transformationMatrix, vector<Vec3 *>& vertices);
 	void forwardRenderingPipeline(Camera *camera);
 };
 
