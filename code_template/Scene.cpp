@@ -14,13 +14,8 @@
 
 using namespace tinyxml2;
 using namespace std;
+#define MAX_DEPTH 99.99
 
-double X_MAX = 1;
-double X_MIN = -1;
-double Y_MAX = 1;
-double Y_MIN = -1;
-double Z_MAX = 1;
-double Z_MIN = -1;
 
 /*
 	Parses XML file
@@ -383,8 +378,8 @@ Matrix4 Scene::getModelingTransformationMatrix(Mesh* mesh) {
 	return modelingTransformationMatrix;
 }
 
-vector<Vec4> Scene::getTransformedTriangleVertices(Triangle& triangle, Matrix4& transformationMatrix, vector<Vec3 *>& vertices) {
-	vector<Vec4> transformed_vertices;
+std::vector<Vec4> Scene::getTransformedTriangleVertices(Triangle& triangle, Matrix4& transformationMatrix, std::vector<Vec3 *>& vertices) {
+	std::vector<Vec4> transformed_vertices;
 
 	Vec3 vertex_0 = *vertices[triangle.vertexIds[0] - 1];
 	Vec3 vertex_1 = *vertices[triangle.vertexIds[1] - 1];
@@ -417,11 +412,57 @@ vector<Vec4> Scene::getTransformedTriangleVertices(Triangle& triangle, Matrix4& 
 	return transformed_vertices;
 }
 
+double f_xy(double x, double y, double x0, double y0, double x1, double y1) {
+	return x * (y0 - y1) + y * (x1 - x0) + (x0 * y1 - y0 * x1);
+}
+
+void Scene::rasterizeTriangle(std::vector<Vec4>& transformed_vertices, std::vector<Color>& triangleVertexColors, Camera* camera, Matrix4& viewportTransformationMatrix, std::vector<std::vector<double>>& depth) {
+	for (int i = 0; i < transformed_vertices.size(); i++) {
+		transformed_vertices[i] = multiplyMatrixWithVec4(viewportTransformationMatrix, transformed_vertices[i]);
+	}
+	
+	double x_min = min(transformed_vertices[0].x, min(transformed_vertices[1].x, transformed_vertices[2].x));
+	double x_max = max(transformed_vertices[0].x, max(transformed_vertices[1].x, transformed_vertices[2].x));
+	double y_min = min(transformed_vertices[0].y, min(transformed_vertices[1].y, transformed_vertices[2].y));
+	double y_max = max(transformed_vertices[0].y, max(transformed_vertices[1].y, transformed_vertices[2].y));
+
+	if (x_max > camera->horRes - 1) x_max = camera->horRes - 1;
+	if (y_max > camera->verRes - 1) y_max = camera->verRes - 1;
+
+	Color color1, color2, color3, color;
+	color1 = triangleVertexColors[0];
+	color2 = triangleVertexColors[1];
+	color3 = triangleVertexColors[2];
+
+	double f01_2 = f_xy(transformed_vertices[2].x, transformed_vertices[2].y, transformed_vertices[0].x, transformed_vertices[0].y, transformed_vertices[1].x, transformed_vertices[1].y);
+	double f12_0 = f_xy(transformed_vertices[0].x, transformed_vertices[0].y, transformed_vertices[1].x, transformed_vertices[1].y, transformed_vertices[2].x, transformed_vertices[2].y);
+	double f20_1 = f_xy(transformed_vertices[1].x, transformed_vertices[1].y, transformed_vertices[2].x, transformed_vertices[2].y, transformed_vertices[0].x, transformed_vertices[0].y);
+	
+	double alpha, beta, gamma;
+	for(int y = y_min; y <= y_max; y++) {
+		for(int x = x_min; x <= x_max; x++) {
+			alpha = f_xy(x, y, transformed_vertices[1].x, transformed_vertices[1].y, transformed_vertices[2].x, transformed_vertices[2].y) / f12_0;
+			beta = f_xy(x, y, transformed_vertices[2].x, transformed_vertices[2].y, transformed_vertices[0].x, transformed_vertices[0].y) / f20_1;
+			gamma = f_xy(x, y, transformed_vertices[0].x, transformed_vertices[0].y, transformed_vertices[1].x, transformed_vertices[1].y) / f01_2;
+
+			if(alpha >= 0 && beta >= 0 && gamma >= 0) {
+				double z_value = alpha * transformed_vertices[0].z + beta * transformed_vertices[1].z + gamma * transformed_vertices[2].z;
+				if(z_value < depth[x][y]) {
+					depth[x][y] = z_value;
+					color = Color(alpha * color1.r + beta * color2.r + gamma * color3.r, alpha * color1.g + beta * color2.g + gamma * color3.g, alpha * color1.b + beta * color2.b + gamma * color3.b);
+					this->image[x][y] = color;
+				}
+			}
+		}
+	}
+}
+
 /*
-	Transformations, clipping, culling, rasterization are done here.
+	T"r"ansformations, clipping, culling, rasterization are done here.
 */
 void Scene::forwardRenderingPipeline(Camera *camera)
 {
+	std::vector<std::vector<double>> depth(camera->horRes, std::vector<double>(camera->verRes, MAX_DEPTH));
 	// ***** Viewing Transformation ***** //
 
 	// Camera Transformation
@@ -446,6 +487,7 @@ void Scene::forwardRenderingPipeline(Camera *camera)
 		for(Triangle& triangle : mesh->triangles) {
 			vector<Vec4> transformed_vertices = getTransformedTriangleVertices(triangle, transformationMatrix, this->vertices);
 
+			// Backface Culling
 			if(this->cullingEnabled) {
 				Vec3 vertex_0 = Vec3(transformed_vertices[0].x, transformed_vertices[0].y, transformed_vertices[0].z);
 				Vec3 vertex_1 = Vec3(transformed_vertices[1].x, transformed_vertices[1].y, transformed_vertices[1].z);
@@ -463,13 +505,10 @@ void Scene::forwardRenderingPipeline(Camera *camera)
 				triangleVertexColors.push_back(*this->colorsOfVertices[triangle.vertexIds[i] - 1]);
 			}
 
-			if(mesh->type == WIREFRAME_MESH) {
-
+			if (mesh->type == SOLID_MESH){
+				rasterizeTriangle(transformed_vertices, triangleVertexColors, camera, viewportTransformationMatrix, depth);
+			}
 		}
 	}
-
-
-
-
 
 }
