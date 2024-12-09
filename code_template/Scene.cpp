@@ -472,6 +472,187 @@ void Scene::rasterizeTriangle(std::vector<Vec4>& transformed_vertices, std::vect
 	}
 }
 
+bool Scene::visible(double den, double num, double& tEnter, double& tLeave) {
+	if(den > 0) { // potentially entering
+		double t = num / den;
+		if(t > tLeave) return false;
+		if(t > tEnter) tEnter = t;
+	}
+	else if(den < 0) { // potentially leaving
+		double t = num / den;
+		if(t < tEnter) return false;
+		if(t < tLeave) tLeave = t;
+	}
+	else if(num > 0) return false; // parallel
+	return true;
+}
+
+bool Scene::clip_line(std::vector<Vec4>& vertices, std::vector<Color>& colors, Matrix4& viewportTransformationMatrix) {
+	double tEnter = 0.0;
+	double tLeave = 1.0;
+
+	Vec4 v0 = vertices[0];
+	Vec4 v1 = vertices[1];
+
+	Color color_v0 = colors[0];
+	Color color_v1 = colors[1];
+
+	double dx = v1.x - v0.x;
+	double dy = v1.y - v0.y;
+	double dz = v1.z - v0.z;
+
+	bool is_visible = false;
+	if(visible(dx, (-1 - v0.x), tEnter, tLeave)) { // left 
+		if(visible(-dx, (v0.x - 1), tEnter, tLeave)) { // right
+			if(visible(dy, (-1 - v0.y), tEnter, tLeave)) { // bottom
+				if(visible(-dy, (v0.y - 1), tEnter, tLeave)) { // top
+					if(visible(dz, (-1 - v0.z), tEnter, tLeave)) { // back
+						if(visible(-dz, (v0.z - 1), tEnter, tLeave)) { // front
+							is_visible = true;
+							if(tLeave < 1) {
+								v1.x = v0.x + dx*tLeave;
+								v1.y = v0.y + dy*tLeave;
+								v1.z = v0.z + dz*tLeave;
+
+								colors[1] = Color(color_v0.r + (color_v1.r - color_v0.r) * tLeave, 
+													color_v0.g + (color_v1.g - color_v0.g) * tLeave, 
+													color_v0.b + (color_v1.b - color_v0.b) * tLeave);
+							}
+							if(tEnter > 0) {
+								v0.x = v0.x + dx*tEnter;
+								v0.y = v0.y + dy*tEnter;
+								v0.z = v0.z + dz*tEnter;
+
+								colors[0] = Color(color_v0.r + (color_v1.r - color_v0.r) * tEnter, 
+													color_v0.g + (color_v1.g - color_v0.g) * tEnter, 
+													color_v0.b + (color_v1.b - color_v0.b) * tEnter);
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return is_visible;
+}
+
+void Scene::rasterizeLine(bool clipped, std::vector<Vec4>& vertices, std::vector<Color>& colors, Matrix4& viewportTransformationMatrix, std::vector<std::vector<double>>& depth) {
+	if(!clipped) return;
+	
+	// Apply viewport transformation after clipping
+	vertices[0] = multiplyMatrixWithVec4(viewportTransformationMatrix, vertices[0]);
+	vertices[1] = multiplyMatrixWithVec4(viewportTransformationMatrix, vertices[1]);
+
+	int x0 = round(vertices[0].x);
+	int y0 = round(vertices[0].y);
+	int x1 = round(vertices[1].x);
+	int y1 = round(vertices[1].y);
+
+	int dx = abs(x1 - x0);
+	int dy = abs(y1 - y0);
+	double m = dx == 0 ? 0 : (double)(y1 - y0) / (x1 - x0);
+
+	if(abs(m) <= 1) {
+		// Handle horizontal-ish lines
+		if(x0 > x1) {
+			std::swap(x0, x1);
+			std::swap(y0, y1);
+			std::swap(colors[0], colors[1]);
+			std::swap(vertices[0].z, vertices[1].z);
+		}
+		
+		int y = y0;
+		int d = 2*dy - dx;
+		int increment = (y1 > y0) ? 1 : -1;
+		
+		for(int x = x0; x <= x1; x++) {
+			if(x >= 0 && x < depth.size() && y >= 0 && y < depth[0].size()) {
+				double t = (x - x0) / (double)(x1 - x0);
+				double z = vertices[0].z * (1-t) + vertices[1].z * t;
+				
+				if(z < depth[x][y]) {
+					depth[x][y] = z;
+					Color color = Color(
+						colors[0].r * (1-t) + colors[1].r * t,
+						colors[0].g * (1-t) + colors[1].g * t,
+						colors[0].b * (1-t) + colors[1].b * t
+					);
+					this->image[x][y] = color;
+				}
+			}
+			
+			if(d < 0) {
+				d += 2*dy;
+			} else {
+				y += increment;
+				d += 2*(dy - dx);
+			}
+		}
+	} else {
+		// Handle vertical-ish lines
+		if(y0 > y1) {
+			std::swap(x0, x1);
+			std::swap(y0, y1);
+			std::swap(colors[0], colors[1]);
+			std::swap(vertices[0].z, vertices[1].z);
+		}
+		
+		int x = x0;
+		int d = 2*dx - dy;
+		int increment = (x1 > x0) ? 1 : -1;
+		
+		for(int y = y0; y <= y1; y++) {
+			if(x >= 0 && x < depth.size() && y >= 0 && y < depth[0].size()) {
+				double t = (y - y0) / (double)(y1 - y0);
+				double z = vertices[0].z * (1-t) + vertices[1].z * t;
+				
+				if(z < depth[x][y]) {
+					depth[x][y] = z;
+					Color color = Color(
+						colors[0].r * (1-t) + colors[1].r * t,
+						colors[0].g * (1-t) + colors[1].g * t,
+						colors[0].b * (1-t) + colors[1].b * t
+					);
+					this->image[x][y] = color;
+				}
+			}
+			
+			if(d < 0) {
+				d += 2*dx;
+			} else {
+				x += increment;
+				d += 2*(dx - dy);
+			}
+		}
+	}
+}
+
+void Scene::processWireframeMesh(std::vector<Vec4>& transformed_vertices, std::vector<Color>& triangleVertexColors, Camera* camera, Matrix4& viewportTransformationMatrix, std::vector<std::vector<double>>& depth) {
+	bool clipped_line0_v0_to_v1;
+	bool clipped_line1_v1_to_v2;
+	bool clipped_line2_v2_to_v0;
+	
+	// first line to clip -> v0 to v1
+	std::vector<Vec4> line0_vertices = copyVec4(transformed_vertices, 0, 1);
+	std::vector<Color> line0_colors = copyColor(triangleVertexColors, 0, 1);
+	clipped_line0_v0_to_v1 = clip_line(line0_vertices, line0_colors, viewportTransformationMatrix);
+
+	// second line to clip -> v1 to v2
+	std::vector<Vec4> line1_vertices = copyVec4(transformed_vertices, 1, 2);
+	std::vector<Color> line1_colors = copyColor(triangleVertexColors, 1, 2);
+	clipped_line1_v1_to_v2 = clip_line(line1_vertices, line1_colors, viewportTransformationMatrix);
+
+	// third line to clip -> v2 to v0
+	std::vector<Vec4> line2_vertices = copyVec4(transformed_vertices, 2, 0);
+	std::vector<Color> line2_colors = copyColor(triangleVertexColors, 2, 0);
+	clipped_line2_v2_to_v0 = clip_line(line2_vertices, line2_colors, viewportTransformationMatrix);
+
+	rasterizeLine(clipped_line0_v0_to_v1, line0_vertices, line0_colors, viewportTransformationMatrix, depth);
+	rasterizeLine(clipped_line1_v1_to_v2, line1_vertices, line1_colors, viewportTransformationMatrix, depth);
+	rasterizeLine(clipped_line2_v2_to_v0, line2_vertices, line2_colors, viewportTransformationMatrix, depth);
+}
+
 /*
 	T"r"ansformations, clipping, culling, rasterization are done here.
 */
@@ -522,6 +703,9 @@ void Scene::forwardRenderingPipeline(Camera *camera)
 
 			if (mesh->type == SOLID_MESH){
 				rasterizeTriangle(transformed_vertices, triangleVertexColors, camera, viewportTransformationMatrix, depth);
+			}
+			else if (mesh->type == WIREFRAME_MESH) {
+				processWireframeMesh(transformed_vertices, triangleVertexColors, camera, viewportTransformationMatrix, depth);
 			}
 		}
 	}

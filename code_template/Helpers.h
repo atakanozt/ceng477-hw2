@@ -5,6 +5,8 @@
 #include "Matrix4.h"
 #include "Vec3.h"
 #include "Vec4.h"
+#include <vector>
+#include "Color.h"
 
 /*
  * Calculate cross product of vec3 a, vec3 b and return resulting vec3.
@@ -74,4 +76,7 @@ Vec4 multiplyMatrixWithVec4(Matrix4 m, Vec4 v);
 
 void printMatrix(Matrix4 m);
 
+std::vector<Vec4> copyVec4(std::vector<Vec4> vertices, int start_index, int end_index);
+
+std::vector<Color> copyColor(std::vector<Color> colors, int start_index, int end_index);
 #endif

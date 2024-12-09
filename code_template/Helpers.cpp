@@ -1,6 +1,8 @@
+#include <vector>
 #include <iostream>
 #include <cmath>
 #include "Helpers.h"
+#include "Color.h"
 
 /*
  * Calculate cross product of vec3 a, vec3 b and return resulting vec3.
@@ -174,4 +176,28 @@ void printMatrix(Matrix4 m) {
         std::cout << std::endl;
     }
     std::cout << "********************" << std::endl;
+}
+
+std::vector<Vec4> copyVec4(std::vector<Vec4> vertices, int start_index, int end_index) {
+    std::vector<Vec4> result;
+    
+    Vec4* x = new Vec4(vertices[start_index].x, vertices[start_index].y, vertices[start_index].z, vertices[start_index].t);
+    result.push_back(*x);
+
+    Vec4* y = new Vec4(vertices[end_index].x, vertices[end_index].y, vertices[end_index].z, vertices[end_index].t);
+    result.push_back(*y);
+
+    return result;
+}
+
+std::vector<Color> copyColor(std::vector<Color> colors, int start_index, int end_index) {
+    std::vector<Color> result;
+    
+    Color* x = new Color(colors[start_index].r, colors[start_index].g, colors[start_index].b);
+    result.push_back(*x);
+
+    Color* y = new Color(colors[end_index].r, colors[end_index].g, colors[end_index].b);
+    result.push_back(*y);
+
+    return result;
 }
