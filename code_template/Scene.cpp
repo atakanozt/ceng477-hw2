@@ -426,8 +426,16 @@ void Scene::rasterizeTriangle(std::vector<Vec4>& transformed_vertices, std::vect
 	double y_min = min(transformed_vertices[0].y, min(transformed_vertices[1].y, transformed_vertices[2].y));
 	double y_max = max(transformed_vertices[0].y, max(transformed_vertices[1].y, transformed_vertices[2].y));
 
-	if (x_max > camera->horRes - 1) x_max = camera->horRes - 1;
-	if (y_max > camera->verRes - 1) y_max = camera->verRes - 1;
+	// Clamp coordinates to valid screen space
+	x_min = max(0.0, ceil(x_min));
+	x_max = min(camera->horRes - 1.0, floor(x_max));
+	y_min = max(0.0, ceil(y_min));
+	y_max = min(camera->verRes - 1.0, floor(y_max));
+
+	// Early exit if triangle is completely outside screen
+	if (x_min > x_max || y_min > y_max) {
+		return;
+	}
 
 	Color color1, color2, color3, color;
 	color1 = triangleVertexColors[0];
@@ -438,21 +446,28 @@ void Scene::rasterizeTriangle(std::vector<Vec4>& transformed_vertices, std::vect
 	double f12_0 = f_xy(transformed_vertices[0].x, transformed_vertices[0].y, transformed_vertices[1].x, transformed_vertices[1].y, transformed_vertices[2].x, transformed_vertices[2].y);
 	double f20_1 = f_xy(transformed_vertices[1].x, transformed_vertices[1].y, transformed_vertices[2].x, transformed_vertices[2].y, transformed_vertices[0].x, transformed_vertices[0].y);
 	
+	// Check if triangle is degenerate
+	if (abs(f01_2) < 1e-6 || abs(f12_0) < 1e-6 || abs(f20_1) < 1e-6) {
+		return;
+	}
+
 	double alpha, beta, gamma;
 	for(int y = y_min; y <= y_max; y++) {
 		for(int x = x_min; x <= x_max; x++) {
-			alpha = f_xy(x, y, transformed_vertices[1].x, transformed_vertices[1].y, transformed_vertices[2].x, transformed_vertices[2].y) / f12_0;
-			beta = f_xy(x, y, transformed_vertices[2].x, transformed_vertices[2].y, transformed_vertices[0].x, transformed_vertices[0].y) / f20_1;
-			gamma = f_xy(x, y, transformed_vertices[0].x, transformed_vertices[0].y, transformed_vertices[1].x, transformed_vertices[1].y) / f01_2;
+				alpha = f_xy(x, y, transformed_vertices[1].x, transformed_vertices[1].y, transformed_vertices[2].x, transformed_vertices[2].y) / f12_0;
+				beta = f_xy(x, y, transformed_vertices[2].x, transformed_vertices[2].y, transformed_vertices[0].x, transformed_vertices[0].y) / f20_1;
+				gamma = f_xy(x, y, transformed_vertices[0].x, transformed_vertices[0].y, transformed_vertices[1].x, transformed_vertices[1].y) / f01_2;
 
-			if(alpha >= 0 && beta >= 0 && gamma >= 0) {
-				double z_value = alpha * transformed_vertices[0].z + beta * transformed_vertices[1].z + gamma * transformed_vertices[2].z;
-				if(z_value < depth[x][y]) {
-					depth[x][y] = z_value;
-					color = Color(alpha * color1.r + beta * color2.r + gamma * color3.r, alpha * color1.g + beta * color2.g + gamma * color3.g, alpha * color1.b + beta * color2.b + gamma * color3.b);
-					this->image[x][y] = color;
+				if(alpha >= 0 && beta >= 0 && gamma >= 0) {
+					double z_value = alpha * transformed_vertices[0].z + beta * transformed_vertices[1].z + gamma * transformed_vertices[2].z;
+					if(z_value < depth[x][y]) {
+						depth[x][y] = z_value;
+						color = Color(alpha * color1.r + beta * color2.r + gamma * color3.r, 
+									alpha * color1.g + beta * color2.g + gamma * color3.g, 
+									alpha * color1.b + beta * color2.b + gamma * color3.b);
+						this->image[x][y] = color;
+					}
 				}
-			}
 		}
 	}
 }
