@@ -551,7 +551,7 @@ void Scene::rasterizeLine(bool clipped, std::vector<Vec4>& vertices, std::vector
 
 	int dx = abs(x1 - x0);
 	int dy = abs(y1 - y0);
-	double m = dx == 0 ? 0 : (double)(y1 - y0) / (x1 - x0);
+	double m = dx == 0 ? INFINITY : (double)(y1 - y0) / (x1 - x0);
 
 	if(abs(m) <= 1) {
 		// Handle horizontal-ish lines
@@ -568,7 +568,7 @@ void Scene::rasterizeLine(bool clipped, std::vector<Vec4>& vertices, std::vector
 		
 		for(int x = x0; x <= x1; x++) {
 			if(x >= 0 && x < depth.size() && y >= 0 && y < depth[0].size()) {
-				double t = (x - x0) / (double)(x1 - x0);
+				double t = dx == 0 ? 0 : (double)(x - x0) / dx;
 				double z = vertices[0].z * (1-t) + vertices[1].z * t;
 				
 				if(z < depth[x][y]) {
@@ -604,7 +604,7 @@ void Scene::rasterizeLine(bool clipped, std::vector<Vec4>& vertices, std::vector
 		
 		for(int y = y0; y <= y1; y++) {
 			if(x >= 0 && x < depth.size() && y >= 0 && y < depth[0].size()) {
-				double t = (y - y0) / (double)(y1 - y0);
+				double t = dy == 0 ? 0 : (double)(y - y0) / dy;
 				double z = vertices[0].z * (1-t) + vertices[1].z * t;
 				
 				if(z < depth[x][y]) {
